@@ -1,0 +1,111 @@
+#!/usr/bin/bash
+##########################################################
+# My custom modifications to Jeroen Janssens code from 
+# http://jeroenjanssens.com/2013/08/16/quickly-navigate-your-filesystem-from-the-command-line.html
+##################### Command line bookmarks #############################
+export MARKPATH=$HOME/.marks
+
+_completemarks() {
+  local curw=${COMP_WORDS[COMP_CWORD]}
+  local wordlist=$(find $MARKPATH -type l -printf "%f\n")
+  COMPREPLY=($(compgen -W '${wordlist[@]}' -- "$curw"))
+  return 0
+}
+
+complete -F _completemarks jump unmark
+
+_get_mark_paths() {
+	shopt -s nullglob
+	jumppaths=($MARKPATH/*)
+	shopt -u nullglob
+	return 0
+}
+
+function jump {
+	if [ -z "$1" ] #if no mark specified
+	then
+		#I'm sure there's a more optimal way to do this
+		_get_mark_paths
+		if [ ${#jumppaths[@]} -eq 0 ]; then
+			echo "No marks available, type 'mark <name>' to create one in the current dir"
+		else
+			options=("${jumppaths[@]##*/}" "Cancel")
+
+			echo "Specify a mark to jump to:"
+			PS3='Please enter your choice: '
+			select choice in "${options[@]}" #display a choice list
+			do
+				if [[ "$choice" ]]; then 
+					case $choice in
+						"Cancel")
+							break
+							;;
+						*)
+						cd -P "$MARKPATH/$choice" 2>/dev/null || echo "No such mark: $choice"
+						;;
+					esac
+				break;
+				else 
+					echo "invalid option $REPLY"; 
+				fi;
+			done
+		fi
+	else
+		cd -P "$MARKPATH/$1" 2>/dev/null || echo "No such mark: $1"
+	fi
+
+	#fi
+}
+
+function mark {
+	# use param 1 as the mark name
+	mkdir -p $MARKPATH; ln -s "$(pwd)" "$MARKPATH/$1"
+}
+
+function unmark {
+
+		if [ -z "$1" ]
+		then
+			_get_mark_paths
+			if [ ${#jumppaths[@]} -eq 0 ]; then
+				echo "No marks available, type 'mark <name>' to create one in the current dir"
+			else
+				options=("${jumppaths[@]##*/}" "Cancel")
+
+				echo "Specify a mark to remove:"
+				PS3='Please enter your choice: '
+				select choice in "${options[@]}" #display a choice list
+				do
+					if [[ "$choice" ]]; then 
+						case $choice in
+							"Cancel")
+								break
+								;;
+							*)
+
+							if [ ! -L "$MARKPATH/$choice" ]; then
+								echo "No such mark: $choice"
+							fi
+							rm -i "$MARKPATH/$choice"
+							;;
+						esac
+					break;
+					else 
+						echo "invalid option $REPLY";
+					fi;
+				done
+			fi
+		else
+			rm -i "$MARKPATH/$1"
+		fi
+}
+
+
+function marks {
+	ls -l $MARKPATH | sed 's/  / /g' | cut -d' ' -f9- | sed 's/ -/\t-/g' && echo
+}
+
+#function osx_marks {
+#	\ls -l "$MARKPATH" | tail -n +2 | sed 's/  / /g' | cut -d' ' -f9- | awk -F ' -> ' '{printf "%-10s -> %s\n", $1, $2}'
+#}
+###################### End command line bookmarks #############################
